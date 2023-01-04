@@ -14,7 +14,7 @@ router.get('/', (req, res) => {
 })
 
 // Rota privada
-router.get('/user/:id', async (req, res) => {
+router.get('/user/:id', checkToken, async (req, res) => {
     const id = req.params.id;
     const user = await User.findById(id, '-password');
     
@@ -22,19 +22,13 @@ router.get('/user/:id', async (req, res) => {
         return res.status(404).json({msg: "usuario não encontrado"});
     }
 
-    try {
-        
-    } catch (error) {
-        console.log(error);
-
-        res.status(422).json({msg: "Aconteceu um erro no servidor!"});
-    }
+    res.status(200).json({msg: `Acesso permitido ao usuário: ${user.name}`});
 })
 
 // Rota de registro
 router.post('/auth/register', async (req, res) => {
     
-    const { email, username, password, confirmPassword } = req.body;
+    const { username, email, password, confirmPassword } = req.body;
 
     if(!email){
         return res.status(422).json({msg: "Email é obrigatório"});
@@ -55,7 +49,7 @@ router.post('/auth/register', async (req, res) => {
     }
     // Criar senha
     const passalt = await bcrypt.genSalt(12);
-    const passHash = await bcrypt.hash(password, salt);
+    const passHash = await bcrypt.hash(password, passalt);
     // Criar usuario
     const user = new User({
         name: username,
@@ -118,3 +112,29 @@ router.post('/auth/user', async (req, res) => {
         res.status(422).json({msg: "Aconteceu um erro no servidor!"});
     }
 });
+
+router.get('/users', async (req, res) => {
+    const users = await User.find();
+
+    res.json(users);
+});
+
+function checkToken(req, res, next){
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(" ")[1];
+
+    if(!token){
+        return res.status(401).json({msg: 'Acesso negado'});
+    }
+
+    try {
+        const secret = process.env.SECRET;
+        jwt.verify(token, secret);
+
+        next();
+    } catch (error) {
+        console.log(error);
+
+        res.status(422).json({msg: "Token inválido"});
+    }
+}
